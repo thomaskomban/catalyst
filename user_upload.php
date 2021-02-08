@@ -27,4 +27,51 @@ foreach($argv as $k => $directives){
     }
 }
 
+if (!$help) {
+    try {
+        if ($parsed == true) {
+            if (file_exists("./{$csvFile[0]}")) {
+                // $handle = fopen("./{$csvFile[0]}", "r");
+                $row = 0;
+                $records = [];
+                if (($handle = fopen("./{$csvFile[0]}", "r")) !== FALSE) {
+                    while (($data = fgetcsv($handle, 1000, ",")) !== FALSE) {
+                        $num = count($data);
+                        if ($row === 0) {
+                            $fields = $data;
+                        } elseif ($row > 0) {
+                            for ($c = 0; $c < $num; $c++) {
+                                $records[$row - 1][$fields[$c]] = $data[$c];
+                            }
+                        }
+                        $row++;
+                    }
+                    fclose($handle);
+                    // print_r($fields);
+                    // var_dump($records);
+
+                } else {
+                    throw new Exception("File does not exist");
+                }
+            } else {
+                throw new Exception("File does not exist");
+            }
+        } elseif ($parsed == false) {
+            throw new Exception('directive "--file" to enable parse file');
+        }
+    } catch (Exception $e) {
+        echo $e->getMessage();
+    }
+} elseif ($help) {
+    echo "\n    --file [csv file name] – this is the name of the CSV to be parsed
+    --create_table – this will cause the MySQL users table to be built (and no further
+                    action will be taken)
+    --dry_run – this will be used with the --file directive in case we want to run the
+            script but not insert into the DB. All other functions will be executed, but the
+            database won't be altered
+    -u – MySQL username
+    -p – MySQL password
+    -h – MySQL host
+    \n";
+}
 
