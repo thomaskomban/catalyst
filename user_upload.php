@@ -1,6 +1,8 @@
 <?php
+// csv filename
 $csvFile = array_slice($argv, -1, 1);
 
+// directives
 $parsed = false;
 $createTable = false;
 $dryRun = false;
@@ -8,12 +10,16 @@ $DBuser = '';
 $DBpwd = '';
 $DBhost = '';
 $help = false;
+
+// user table
 $usersTable = 'CREATE TABLE users (
             id INT(6) UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
             name VARCHAR(30),
             surname VARCHAR(30),
             email VARCHAR(50) UNIQUE                    
-        )';        
+        )';  
+        
+// split the directives to differentiate its functionality        
 foreach($argv as $k => $directives){
     if ('--file' === $directives) {
         $parsed = true;
@@ -42,8 +48,10 @@ if (!$help) {
                     while (($data = fgetcsv($handle, 1000, ",")) !== FALSE) {
                         $num = count($data);
                         if ($row === 0) {
+                            // first row for fields separated
                             foreach($data as $k => $v) { $fields[$k] = trim($v); };
                         } elseif ($row > 0) {
+                            // records created to its respective fields
                             for ($c = 0; $c < $num; $c++) {
                                 $records[$row - 1][$fields[$c]] = trim($data[$c]);
                             }
@@ -51,6 +59,7 @@ if (!$help) {
                         $row++;
                     }
                     fclose($handle);
+                    // --dry_run outputs the data
                     if ($dryRun) {
                         print_r($fields);
                         echo "pre"; print_r($records); echo "pre";
@@ -61,7 +70,7 @@ if (!$help) {
                                 $s = ''; 
                                 $err = false;                              
                                 foreach($fields as $field) {
-                                    // if (!($field === 'email' && preg_match("/^[_a-z0-9-]+(\.[_a-z0-9-]+)*@[a-z0-9-]+(\.[a-z0-9-]+)*(\.[a-z]{2,})$/i", $record[$field]))) {
+                                    // email validation
                                     if (!filter_var($record[$field], FILTER_VALIDATE_EMAIL) && $field == 'email') {                                                                            
                                         $err = true;                                         
                                     } elseif ($field == 'name' || $fields == 'surname') {
@@ -77,7 +86,8 @@ if (!$help) {
                                 }                               
                             }
                             fclose(STDOUT);
-                            $sql = substr($sql, 0, -1);                            
+                            // collection the data to form insert statement 
+                            $sql = substr($sql, 0, -1);                                                        
                             if (mysqli_query($conn, $sql) === true) {
                                 mysqli_close($conn);
                                 throw new Exception('Records created');
@@ -95,13 +105,14 @@ if (!$help) {
                 throw new Exception("File does not exist");
             }
         } 
-
+        // new table created
         if ($createTable) {
             if ($conn = dbConn($DBhost, $DBuser, $DBpwd)) {
                 
                 if ($conn->query($usersTable) === true){
                     throw new Exception("'Users' table Created");
-                } else {                    
+                } else {     
+                    // table is dropped and rebuilt               
                     $sql = "DROP TABLE IF EXISTS users";
                     if ($conn->query($sql)) {
                         if ($conn->query($usersTable) === true) {
@@ -121,6 +132,7 @@ if (!$help) {
         echo $e->getMessage();
     }
 } elseif ($help) {
+    // --help directive
     echo "\n    Syntax to call the file - php user_upload.php <directives> <csv filename with extension>
 
     --file [csv file name] – (syntax) php user_upload.php --file -u root -h localhost:3306 users.csv > output.txt
@@ -141,7 +153,7 @@ if (!$help) {
     --help - (syntax) php user_upload.php --help users.csv
     \n";
 }
-// CLI: php user_upload.php --create_table -u root -h localhost:3306 users.csv
+// Database connection
 function dbConn($host, $uname, $pwd){ 
     @$mysqli = new mysqli($host, $uname, $pwd, 'catalyst');
     
