@@ -8,7 +8,12 @@ $DBuser = '';
 $DBpwd = '';
 $DBhost = '';
 $help = false;
-
+$usersTable = 'CREATE TABLE users (
+            id INT(6) UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
+            name VARCHAR(30),
+            surname VARCHAR(30),
+            email VARCHAR(50) UNIQUE                    
+        )';        
 foreach($argv as $k => $directives){
     if ('--file' === $directives) {
         $parsed = true;
@@ -37,10 +42,10 @@ if (!$help) {
                     while (($data = fgetcsv($handle, 1000, ",")) !== FALSE) {
                         $num = count($data);
                         if ($row === 0) {
-                            $fields = $data;
+                            foreach($data as $k => $v) { $fields[$k] = trim($v); };
                         } elseif ($row > 0) {
                             for ($c = 0; $c < $num; $c++) {
-                                $records[$row - 1][trim($fields[$c])] = trim($data[$c]);
+                                $records[$row - 1][$fields[$c]] = trim($data[$c]);
                             }
                         }
                         $row++;
@@ -51,16 +56,27 @@ if (!$help) {
                         echo "pre"; print_r($records); echo "pre";
                     } else {
                         if ($conn = dbConn($DBhost, $DBuser, $DBpwd)) {
-                            $sql = "INSERT INTO users (" . trim(implode(',', $fields)) . ") VALUES ";
-                            foreach($records as $record) {
-                                // print_r($record); 
-                                $s = '';                               
-                                foreach($fields as $field) {                                    
-                                    $s .= "'" . addslashes($record[trim($field)]) . "',";
+                            $sql = "INSERT INTO users (" . implode(',', $fields) . ") VALUES ";
+                            foreach($records as $record) { 
+                                $s = ''; 
+                                $err = false;                              
+                                foreach($fields as $field) {
+                                    // if (!($field === 'email' && preg_match("/^[_a-z0-9-]+(\.[_a-z0-9-]+)*@[a-z0-9-]+(\.[a-z0-9-]+)*(\.[a-z]{2,})$/i", $record[$field]))) {
+                                    if (!filter_var($record[$field], FILTER_VALIDATE_EMAIL) && $field == 'email') {                                                                            
+                                        $err = true;                                         
+                                    } elseif ($field == 'name' || $fields == 'surname') {
+                                        $record[$field] = ucwords($record[$field]);
+                                    }
+                                    $s .= "'" . addslashes($record[$field]) . "',";                                    
                                 }
-                                $s = substr($s, 0, -1);
-                                $sql .= "({$s}),";                                
+                                if ($err) {
+                                    fwrite(STDOUT, $s . PHP_EOL);                                                                        
+                                } else {
+                                    $s = substr($s, 0, -1);
+                                    $sql .= "({$s}),";                                    
+                                }                               
                             }
+                            fclose(STDOUT);
                             $sql = substr($sql, 0, -1);                            
                             if (mysqli_query($conn, $sql) === true) {
                                 mysqli_close($conn);
@@ -82,16 +98,20 @@ if (!$help) {
 
         if ($createTable) {
             if ($conn = dbConn($DBhost, $DBuser, $DBpwd)) {
-                $sql = 'CREATE TABLE users (
-                    id INT(6) UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
-                    name VARCHAR(30),
-                    surname VARCHAR(30),
-                    email VARCHAR(50) UNIQUE                    
-                    )';
-                if ($conn->query($sql) === true){
-                    throw new Exception('Users table Created');
-                } else {
-                    throw new Exception($conn->error);
+                
+                if ($conn->query($usersTable) === true){
+                    throw new Exception("'Users' table Created");
+                } else {                    
+                    $sql = "DROP TABLE IF EXISTS users";
+                    if ($conn->query($sql)) {
+                        if ($conn->query($usersTable) === true) {
+                            throw new Exception("'Users' table rebuilt");
+                        } else {
+                            throw new Exception($conn->error);
+                        }
+                    } else {
+                        throw new Exception($conn->error);
+                    }
                 }
             } else {
                 throw new Exception('Database not connected');
@@ -103,7 +123,7 @@ if (!$help) {
 } elseif ($help) {
     echo "\n    Syntax to call the file - php user_upload.php <directives> <csv filename with extension>
 
-    --file [csv file name] – (syntax) php user_upload.php --file -u root -h localhost:3306 users.csv 
+    --file [csv file name] – (syntax) php user_upload.php --file -u root -h localhost:3306 users.csv > output.txt
                              this is the name of the CSV to be parsed
 
     --create_table – (syntax) php user_upload.php --create_table -u root -h localhost:3306 users.csv 
